@@ -11,16 +11,13 @@ const FAVICON_16: Asset = asset!("/assets/favicon/favicon-16x16.png");
 const FAVICON_32: Asset = asset!("/assets/favicon/favicon-32x32.png");
 const ENSO_CIRCLE: Asset = asset!("/assets/enso_circle.png");
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
-const ZEN_BELL: Asset = asset!("/assets/zen_bell.wav");
-
-// printar     tracing::debug!("Teste");
+const ZEN_BELL: Asset = asset!("/assets/zen_bell.mp3");
 
 #[derive(Clone, Copy, Debug)]
 struct Timer {
     remaining: Duration,
     overtime: Duration,
     preparation: Duration,
-    bell_remaining: bool,
     active: bool,
     run_id: u32,
 }
@@ -30,8 +27,7 @@ impl Timer {
         Self {
             remaining: Duration::from_secs(total_seconds),
             overtime: Duration::ZERO,
-            preparation: Duration::from_secs(5),
-            bell_remaining: true,
+            preparation: Duration::from_secs(30),
             active: false,
             run_id: 1,
         }
@@ -64,12 +60,13 @@ fn main() {
 
 #[component]
 fn App() -> Element {
-    //TODO -> modify to 25 * 60
-    let mut timer = use_signal(|| Timer::new(17));
+    let mut timer = use_signal(|| Timer::new(20 * 60));
+    let zen_bell_path = ZEN_BELL.to_string();
+    let mut audio = use_signal(|| HtmlAudioElement::new_with_src(&zen_bell_path).expect("failed to create audio element"));
 
     rsx!(
 
-        TailwindStyles {}
+        StylesAndLinks {}
         div { class: "flex flex-col items-center justify-center min-h-screen bg-black p-6",
             TimerDisplay { timer }
 
@@ -122,8 +119,7 @@ fn App() -> Element {
                                             .preparation
                                             .saturating_sub(Duration::from_secs(1));
                                         if timer().preparation_seconds() == 1 {
-                                            ZenBell();
-                                        }
+                                                let _ = audio().play();                                        }
 
                                     }
 
@@ -133,10 +129,10 @@ fn App() -> Element {
                                             break;
                                         }
                                         let mut timer = timer.write();
-                                        if timer.seconds() > 0 {
+                                        if timer.remaining > Duration::ZERO {
                                             timer.remaining -= Duration::from_secs(1);
                                             if timer.minutes() == 0 && timer.seconds() == 1 {
-                                                ZenBell();
+                                                let _ = audio().play();
                                             }
                                         } else {
                                             timer.overtime += Duration::from_secs(1);
@@ -160,10 +156,9 @@ fn App() -> Element {
                             let new_run_id = t.run_id + 1;
                             timer
                                 .set(Timer {
-                                    remaining: Duration::from_secs(15),
+                                    remaining: Duration::from_secs(20 * 60),
                                     overtime: Duration::ZERO,
-                                    preparation: Duration::from_secs(5),
-                                    bell_remaining: true,
+                                    preparation: Duration::from_secs(30),
                                     active: false,
                                     run_id: new_run_id,
                                 });
@@ -216,7 +211,7 @@ fn TimerDisplay(timer: Signal<Timer>) -> Element {
                     h2 { class: "font-mono text-3xl text-blue-400 animate-pulse",
                         "Preparation: {preparation_sec}s"
                     }
-                } else if overtime_sec > 0 {
+                } else if timer().overtime > Duration::ZERO {
                     h2 { class: "font-mono text-3xl bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-yellow-500 animate-pulse",
                         "+{overtime_min}:{overtime_sec:02}"
                     }
@@ -228,24 +223,15 @@ fn TimerDisplay(timer: Signal<Timer>) -> Element {
     }
 }
 
-pub fn ZenBell() {
-    let zen_bell_path = ZEN_BELL.to_string();
-
-    let audio =
-        HtmlAudioElement::new_with_src(&zen_bell_path).expect("failed to create audio element");
-
-    let _ = audio.play();
-}
-
 #[component]
-pub fn TailwindStyles() -> Element {
+pub fn StylesAndLinks() -> Element {
     rsx! {
-            document::Link { rel: "icon", href: FAVICON }
-            document::Link { rel: "icon", href: ANDROID_CHROME_192 },
-            document::Link { rel: "icon", href: ANDROID_CHROME_512 },
-            document::Link { rel: "apple-touch-icon", href: APPLE_TOUCH_ICON },
-            document::Link { rel: "icon", href: FAVICON_16 },
-            document::Link { rel: "icon", href: FAVICON_32 },
-            document::Stylesheet {href: TAILWIND_CSS}
-        }
+        document::Link { rel: "icon", href: FAVICON }
+        document::Link { rel: "icon", href: ANDROID_CHROME_192 },
+        document::Link { rel: "icon", href: ANDROID_CHROME_512 },
+        document::Link { rel: "apple-touch-icon", href: APPLE_TOUCH_ICON },
+        document::Link { rel: "icon", href: FAVICON_16 },
+        document::Link { rel: "icon", href: FAVICON_32 },
+        document::Stylesheet {href: TAILWIND_CSS}
+    }
 }
