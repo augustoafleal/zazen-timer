@@ -17,6 +17,7 @@ asset_dir = "public"
 
 # HTML title tag content
 title = "Zazen"
+base_path = "zazen-timer"
 
 [web.watcher]
 
