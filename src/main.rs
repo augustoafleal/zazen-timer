@@ -62,7 +62,7 @@ fn main() {
 fn App() -> Element {
     let mut timer = use_signal(|| Timer::new(20 * 60));
     let zen_bell_path = ZEN_BELL.to_string();
-    let mut audio = use_signal(|| HtmlAudioElement::new_with_src(&zen_bell_path).expect("failed to create audio element"));
+    let audio = use_signal(|| HtmlAudioElement::new_with_src(&zen_bell_path).expect("failed to create audio element"));
 
     rsx!(
 
