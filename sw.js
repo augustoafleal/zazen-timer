@@ -1,10 +1,8 @@
-"use strict";
+const VERSION = "v1";
 
-//console.log('WORKER: executing.');
+const CACHE_NAME = `zazen-timer-${VERSION}`;
 
-var version = 'v1.0-';
-
-var offlineFundamentals = [
+const APP_STATIC_RESOURCES = [
     '/zazen-timer/',
     '/zazen-timer/index.html',
     '/zazen-timer/sw.js',
@@ -33,89 +31,46 @@ var offlineFundamentals = [
     "/zazen-timer/assets/zen_bell-42d354ce545048ce.mp3.br"
 ];
 
-self.addEventListener("install", function (event) {
-  //console.log('WORKER: install event in progress.');
+self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches
-      .open(version + 'fundamentals')
-      .then(function (cache) {
-        return cache.addAll(offlineFundamentals);
-      })
-      .then(function () {
-        //console.log('WORKER: install completed');
-      })
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      cache.addAll(APP_STATIC_RESOURCES);
+    })()
   );
 });
 
-self.addEventListener("fetch", function (event) {
-  //console.log('WORKER: fetch event in progress.');
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      const names = await caches.keys();
+      await Promise.all(
+        names.map((name) => {
+          if (name !== CACHE_NAME) {
+            return caches.delete(name);
+          }
+        })
+      );
+      await clients.claim();
+    })()
+  );
+});
 
-  if (event.request.method !== 'GET') {
-    //console.log('WORKER: fetch event ignored.', event.request.method, event.request.url);
+self.addEventListener("fetch", (event) => {
+  // As a single page app, direct app to always go to cached home page.
+  if (event.request.mode === "navigate") {
+    event.respondWith(caches.match("/zazen-timer/"));
     return;
   }
 
   event.respondWith(
-    caches
-      .match(event.request)
-      .then(function (cached) {
-        var networked = fetch(event.request)
-          .then(fetchedFromNetwork, unableToResolve)
-          .catch(unableToResolve);
-
-        //console.log('WORKER: fetch event', cached ? '(cached)' : '(network)', event.request.url);
-        return cached || networked;
-
-        function fetchedFromNetwork(response) {
-          var cacheCopy = response.clone();
-
-          //console.log('WORKER: fetch response from network.', event.request.url);
-
-          caches
-            .open(version + 'pages')
-            .then(function add(cache) {
-              cache.put(event.request, cacheCopy);
-            })
-            .then(function () {
-              //console.log('WORKER: fetch response stored in cache.', event.request.url);
-            });
-
-          return response;
-        }
-
-        function unableToResolve() {
-          //console.log('WORKER: fetch request failed in both cache and network.');
-          return new Response('<h1>Service Unavailable</h1>', {
-            status: 503,
-            statusText: 'Service Unavailable',
-            headers: new Headers({
-              'Content-Type': 'text/html'
-            })
-          });
-        }
-      })
-  );
-});
-
-self.addEventListener("activate", function (event) {
-  //console.log('WORKER: activate event in progress.');
-
-  event.waitUntil(
-    caches
-      .keys()
-      .then(function (keys) {
-        return Promise.all(
-          keys
-            .filter(function (key) {
-              return !key.startsWith(version);
-            })
-            .map(function (key) {
-              return caches.delete(key);
-            })
-        );
-      })
-      .then(function () {
-        //console.log('WORKER: activate completed.');
-      })
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const cachedResponse = await cache.match(event.request);
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return new Response(null, { status: 404 });
+    })()
   );
 });
