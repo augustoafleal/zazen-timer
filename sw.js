@@ -3,10 +3,10 @@ const VERSION = "v1";
 const CACHE_NAME = `zazen-timer-${VERSION}`;
 
 const APP_STATIC_RESOURCES = [
-    '/zazen-timer/',
-    '/zazen-timer/index.html',
-    '/zazen-timer/sw.js',
-    '/zazen-timer/manifest.json',
+    "/zazen-timer/",
+    "/zazen-timer/index.html",
+    "/zazen-timer/sw.js",
+    "/zazen-timer/manifest.json",
     "/zazen-timer/assets/android-chrome-192x192-00e229331706da6e.png",
     "/zazen-timer/assets/android-chrome-192x192-00e229331706da6e.png.br",
     "/zazen-timer/assets/android-chrome-512x512-b465b1095964a27e.png",
@@ -57,12 +57,6 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // As a single page app, direct app to always go to cached home page.
-  if (event.request.mode === "navigate") {
-    event.respondWith(caches.match("/zazen-timer/"));
-    return;
-  }
-
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
