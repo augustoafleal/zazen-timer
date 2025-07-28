@@ -7,7 +7,6 @@
 	"dir": "ltr",
 	"lang": "en",
 	"display": "standalone",
-	"display_override": ["window-control-overlay", "standalone"],
 	"background_color": "#000000",
 	"theme_color": "#000000",
 	"orientation": "portrait",

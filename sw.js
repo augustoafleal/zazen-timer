@@ -1,122 +1,121 @@
-'use strict';
+"use strict";
 
-const CACHE_VERSION = 'v1';
-const CACHE_NAME = CACHE_VERSION;
+//console.log('WORKER: executing.');
 
-const contentToCache = [
-    '/zazen-timer/',
-    '/zazen-timer/index.html',
-    '/zazen-timer/sw.js',
-    '/zazen-timer/manifest.json',
+var version = 'v1.0.0::';
+
+var offlineFundamentals = [
+    "/zazen-timer/",
+    "/zazen-timer/index.html",
+    "/zazen-timer/sw.js",
+    "/zazen-timer/manifest.json",
+    "android-chrome-192x192-00e229331706da6e.png",
+    "android-chrome-192x192-00e229331706da6e.png.br",
+    "android-chrome-512x512-b465b1095964a27e.png",
+    "android-chrome-512x512-b465b1095964a27e.png.br",
+    "apple-touch-icon-5954c36cf87286a2.png",
+    "apple-touch-icon-5954c36cf87286a2.png.br",
+    "enso_circle-8116133f6f0a8d44.png",
+    "enso_circle-8116133f6f0a8d44.png.br",
+    "favicon-16x16-19a2cf29fcf333e1.png",
+    "favicon-16x16-19a2cf29fcf333e1.png.br",
+    "favicon-32x32-7459cfa09b5fb6c9.png",
+    "favicon-32x32-7459cfa09b5fb6c9.png.br",
+    "favicon-3c099ab66f83c54b.ico",
+    "favicon-3c099ab66f83c54b.ico.br",
+    "tailwind-783990df4970675f.css",
+    "tailwind-783990df4970675f.css.br",
+    "zazen_timer-ed7cd2f393e276e6.js",
+    "zazen_timer-ed7cd2f393e276e6.js.br",
+    "zazen_timer_bg-d6b8f6f8f8f3da96.wasm",
+    "zazen_timer_bg-d6b8f6f8f8f3da96.wasm.br",
+    "zen_bell-42d354ce545048ce.mp3",
+    "zen_bell-42d354ce545048ce.mp3.br"
 ];
 
-self.addEventListener('install', function (event) {
-    //console.log('[SW] Install event');
-    event.waitUntil(
-        caches.open(CACHE_NAME).then(function (cache) {
-            //console.log('[SW] Caching app shell and content');
-            return cache.addAll(contentToCache);
-        }).then(function () {
-            //console.log('[SW] Skip waiting');
-            return self.skipWaiting();
-        })
-    );
+self.addEventListener("install", function (event) {
+  //console.log('WORKER: install event in progress.');
+  event.waitUntil(
+    caches
+      .open(version + 'fundamentals')
+      .then(function (cache) {
+        return cache.addAll(offlineFundamentals);
+      })
+      .then(function () {
+        //console.log('WORKER: install completed');
+      })
+  );
 });
 
-self.addEventListener('activate', function (event) {
-    //console.log('[SW] Activate event');
-    event.waitUntil(
-        self.clients.claim().then(function () {
-            //console.log('[SW] Clients claimed');
-        })
-    );
+self.addEventListener("fetch", function (event) {
+  //console.log('WORKER: fetch event in progress.');
+
+  if (event.request.method !== 'GET') {
+    //console.log('WORKER: fetch event ignored.', event.request.method, event.request.url);
+    return;
+  }
+
+  event.respondWith(
+    caches
+      .match(event.request)
+      .then(function (cached) {
+        var networked = fetch(event.request)
+          .then(fetchedFromNetwork, unableToResolve)
+          .catch(unableToResolve);
+
+        //console.log('WORKER: fetch event', cached ? '(cached)' : '(network)', event.request.url);
+        return cached || networked;
+
+        function fetchedFromNetwork(response) {
+          var cacheCopy = response.clone();
+
+          //console.log('WORKER: fetch response from network.', event.request.url);
+
+          caches
+            .open(version + 'pages')
+            .then(function add(cache) {
+              cache.put(event.request, cacheCopy);
+            })
+            .then(function () {
+              //console.log('WORKER: fetch response stored in cache.', event.request.url);
+            });
+
+          return response;
+        }
+
+        function unableToResolve() {
+          //console.log('WORKER: fetch request failed in both cache and network.');
+          return new Response('<h1>Service Unavailable</h1>', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: new Headers({
+              'Content-Type': 'text/html'
+            })
+          });
+        }
+      })
+  );
 });
 
-self.addEventListener('fetch', function (event) {
-    const url = event.request.url;
-    const isAudio = url.endsWith('.mp3');
+self.addEventListener("activate", function (event) {
+  //console.log('WORKER: activate event in progress.');
 
-    if (!url.startsWith(self.location.origin)) {
-        return;
-    }
-
-    if (isAudio) {
-        //console.log(`[SW] Fetching audio: ${url}`);
-
-        event.respondWith(
-            caches.match(event.request).then(function (response) {
-                if (!response) {
-                    //console.log('[SW] Audio not found in cache, falling back to network');
-                    return fetch(event.request);
-                }
-
-                const rangeHeader = event.request.headers.get('range');
-                if (rangeHeader) {
-                    //console.log('[SW] Range request detected:', rangeHeader);
-                    return rangeable_resp(event.request, response);
-                }
-
-                //console.log('[SW] Returning full audio from cache');
-                return response;
+  event.waitUntil(
+    caches
+      .keys()
+      .then(function (keys) {
+        return Promise.all(
+          keys
+            .filter(function (key) {
+              return !key.startsWith(version);
+            })
+            .map(function (key) {
+              return caches.delete(key);
             })
         );
-    } else {
-        event.respondWith(
-            caches.match(event.request).then(function (response) {
-                if (response) {
-                    //console.log(`[SW] Cache hit: ${url}`);
-                    return response;
-                }
-
-                //console.log(`[SW] Cache miss: ${url}, fetching from network`);
-                return fetch(event.request).then(function (networkResponse) {
-                    return caches.open(CACHE_NAME).then(function (cache) {
-                        //console.log(`[SW] Caching new resource: ${url}`);
-                        cache.put(event.request, networkResponse.clone());
-                        return networkResponse;
-                    });
-                });
-            })
-        );
-    }
+      })
+      .then(function () {
+        //console.log('WORKER: activate completed.');
+      })
+  );
 });
-
-function rangeable_resp(request, resp) {
-    let range = /^bytes=(\d*)-(\d*)$/gi.exec(request.headers.get('range'));
-    if (range === null || (range[1] === '' && range[2] === '')) {
-        //console.log('[SW] Invalid or empty Range header, returning full response');
-        return resp;
-    }
-
-    return resp.arrayBuffer().then(function (ab) {
-        const total = ab.byteLength;
-        let start = Number(range[1]);
-        let end = Number(range[2]);
-
-        if (range[1] === '') {
-            start = total - end;
-            end = total - 1;
-        }
-        if (range[2] === '') {
-            end = total - 1;
-        }
-
-        if (start > end || end >= total || start < 0) {
-            //console.log('[SW] Invalid byte range, returning full response');
-            return resp;
-        }
-
-        const headers = new Headers(resp.headers);
-        headers.set('Content-Range', `bytes ${start}-${end}/${total}`);
-        headers.set('Content-Length', end - start + 1);
-        headers.set('Accept-Ranges', 'bytes');
-
-        //console.log(`[SW] Returning partial content: bytes ${start}-${end}/${total}`);
-
-        return new Response(ab.slice(start, end + 1), {
-            status: 206,
-            statusText: 'Partial Content',
-            headers: headers,
-        });
-    });
-}
