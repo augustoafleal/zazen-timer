@@ -1,7 +1,9 @@
-use dioxus::prelude::*;
+use dioxus::{html::audio, prelude::*};
 use gloo_timers::future::TimeoutFuture;
 use std::time::Duration;
 use web_sys::HtmlAudioElement;
+use wasm_bindgen_futures::JsFuture;
+
 
 const FAVICON: Asset = asset!("/assets/favicon/favicon.ico");
 const ANDROID_CHROME_192: Asset = asset!("/assets/favicon/android-chrome-192x192.png");
@@ -65,7 +67,7 @@ fn App() -> Element {
     let audio = use_signal(|| HtmlAudioElement::new_with_src(&zen_bell_path).expect("failed to create audio element"));
 
     rsx!(
-
+    
         StylesAndLinks {}
         div { class: "flex flex-col items-center justify-center min-h-screen bg-black p-6",
             TimerDisplay { timer }
@@ -75,7 +77,7 @@ fn App() -> Element {
 
                     button {
                         class: "px-6 py-3 bg-transparent text-white rounded-lg border border-white/20 hover:bg-white/10
-                                        transition-all duration-200 font-medium flex items-center justify-center",
+                                                transition-all duration-200 font-medium flex items-center justify-center",
                         onclick: move |_| {
                             if (!timer().active) && (timer().minutes() > 5) {
                                 timer.write().remaining = (timer().remaining - Duration::from_secs(5 * 60))
@@ -87,7 +89,7 @@ fn App() -> Element {
 
                     button {
                         class: "px-6 py-3 bg-transparent text-white rounded-lg border border-white/20 hover:bg-white/10
-                                        transition-all duration-200 font-medium flex items-center justify-center",
+                                                transition-all duration-200 font-medium flex items-center justify-center",
                         onclick: move |_| {
                             if !timer().active {
                                 timer.write().remaining = (timer().remaining + Duration::from_secs(5 * 60))
@@ -101,15 +103,22 @@ fn App() -> Element {
 
                     button {
                         class: "px-6 py-3 bg-white text-black rounded-lg hover:bg-gray-200
-                                        transition-all duration-200 font-medium flex items-center justify-center",
+                                                transition-all duration-200 font-medium flex items-center justify-center",
                         onclick: move |_| {
-
                             timer.write().active = !timer().active;
                             if timer().active {
-                                let current_run = timer().run_id;
-
+                                let audio_ref = audio();
                                 spawn(async move {
-
+                                    audio_ref.set_volume(0.0);
+                                    if let Ok(promise) = audio_ref.play() {
+                                        let _ = JsFuture::from(promise).await;
+                                        let _ = audio_ref.pause();
+                                        let _ = audio_ref.set_current_time(0.0);
+                                    }
+                                    audio_ref.set_volume(1.0);
+                                });
+                                let current_run = timer().run_id;
+                                spawn(async move {
                                     while timer().active && timer().preparation > Duration::ZERO {
                                         TimeoutFuture::new(1_000).await;
                                         if timer().run_id != current_run {
@@ -119,10 +128,9 @@ fn App() -> Element {
                                             .preparation
                                             .saturating_sub(Duration::from_secs(1));
                                         if timer().preparation_seconds() == 1 {
-                                                let _ = audio().play();                                        }
-
+                                            play_audio(audio()).await;
+                                        }
                                     }
-
                                     while timer().active {
                                         TimeoutFuture::new(1_000).await;
                                         if timer().run_id != current_run {
@@ -132,7 +140,7 @@ fn App() -> Element {
                                         if timer.remaining > Duration::ZERO {
                                             timer.remaining -= Duration::from_secs(1);
                                             if timer.minutes() == 0 && timer.seconds() == 1 {
-                                                let _ = audio().play();
+                                                play_audio(audio()).await;
                                             }
                                         } else {
                                             timer.overtime += Duration::from_secs(1);
@@ -150,7 +158,7 @@ fn App() -> Element {
 
                     button {
                         class: "px-6 py-3 bg-transparent text-white rounded-lg border border-white/20 hover:bg-white/10
-                                        transition-all duration-200 font-medium flex items-center justify-center",
+                                                transition-all duration-200 font-medium flex items-center justify-center",
                         onclick: move |_| {
                             let mut t = timer();
                             let new_run_id = t.run_id + 1;
@@ -169,8 +177,11 @@ fn App() -> Element {
             }
         }
 
-
     )
+}
+
+async fn play_audio(audio: HtmlAudioElement) {
+    let _ = JsFuture::from(audio.play().unwrap()).await;
 }
 
 #[component]
